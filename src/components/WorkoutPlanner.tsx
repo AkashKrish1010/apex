@@ -9,12 +9,13 @@ export default function WorkoutPlanner() {
   const { addWorkout, state } = useAppStore();
   const [session, setSession] = useState<ExerciseEntry[]>([]);
   const [filter, setFilter] = useState('All');
+  const [savedMsg, setSavedMsg] = useState(false);
 
   const categories = ['All', ...Array.from(new Set(EXERCISES.map(e => e.group)))];
   const filteredLibrary = filter === 'All' ? EXERCISES : EXERCISES.filter(e => e.group === filter);
 
   const addToSession = (ex: typeof EXERCISES[0]) => {
-    const id = Date.now().toString() + Math.random().toString();
+    const id = crypto.randomUUID();
     setSession(prev => [...prev, { ...ex, id, completed: false, weight: 0 }]);
   };
 
@@ -52,7 +53,9 @@ export default function WorkoutPlanner() {
     );
     
     setSession([]);
-    alert("Workout Saved!");
+    // Show inline save confirmation instead of alert()
+    setSavedMsg(true);
+    setTimeout(() => setSavedMsg(false), 3000);
   };
 
   return (
@@ -167,6 +170,11 @@ export default function WorkoutPlanner() {
               >
                 FINISH WORKOUT
               </button>
+              {savedMsg && (
+                <p className="text-lime-400 font-mono text-xs text-center mt-2 animate-pulse">
+                  WORKOUT SAVED SUCCESSFULLY
+                </p>
+              )}
             </div>
 
             {/* History */}

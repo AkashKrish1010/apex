@@ -8,6 +8,7 @@ export default function WeightTracker() {
   const { state, addWeightLog, deleteWeightLog } = useAppStore();
   const [weightInput, setWeightInput] = useState('');
   const [dateInput, setDateInput] = useState(new Date().toISOString().split('T')[0]);
+  const [inputError, setInputError] = useState('');
   const pathRef = useRef<SVGPathElement>(null);
 
   const history = state.weightHistory;
@@ -21,10 +22,21 @@ export default function WeightTracker() {
   }, [history, state.profile.weight]);
 
   const handleLog = () => {
-    if (weightInput && dateInput) {
-      addWeightLog(Number(weightInput), dateInput);
-      setWeightInput('');
+    const w = parseFloat(weightInput);
+    // Validate weight: must be a positive finite number within human range
+    if (!weightInput || !isFinite(w) || w <= 0 || w > 700) {
+      setInputError('Enter a valid weight between 0.1 and 700.');
+      return;
     }
+    // Validate date: must parse correctly
+    const parsedDate = new Date(dateInput);
+    if (!dateInput || isNaN(parsedDate.getTime())) {
+      setInputError('Enter a valid date.');
+      return;
+    }
+    setInputError('');
+    addWeightLog(w, dateInput);
+    setWeightInput('');
   };
 
   // SVG Chart generation
@@ -137,6 +149,9 @@ export default function WeightTracker() {
             >
               SAVE LOG
             </button>
+            {inputError && (
+              <p className="text-red-400 font-mono text-xs mt-2">{inputError}</p>
+            )}
             <div className="mt-6 flex flex-col gap-2 max-h-[250px] overflow-y-auto pr-2 scrollbar-thin">
               {[...history].reverse().map(log => (
                 <div key={log.id} className="flex justify-between items-center p-3 border border-dark-border bg-dark group">

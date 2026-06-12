@@ -14,14 +14,21 @@ export default function BmiCalculator() {
   const [inputHeight, setInputHeight] = useState(profile.height);
   const [inputWeight, setInputWeight] = useState(profile.weight);
   const [unit, setUnit] = useState(profile.unitSystem);
+  const [validationError, setValidationError] = useState('');
 
   const containerRef = useRef<HTMLElement>(null);
   const needleRef = useRef<SVGGElement>(null);
   const counterRef = useRef<HTMLSpanElement>(null);
 
   const handleCalculate = () => {
+    // Input validation
+    if (inputName.length > 100) { setValidationError('Name must be 100 characters or fewer.'); return; }
+    if (!Number.isFinite(inputAge) || inputAge < 1 || inputAge > 120) { setValidationError('Age must be between 1 and 120.'); return; }
+    if (!Number.isFinite(inputHeight) || inputHeight <= 0 || inputHeight > 300) { setValidationError('Height must be between 1 and 300.'); return; }
+    if (!Number.isFinite(inputWeight) || inputWeight <= 0 || inputWeight > 700) { setValidationError('Weight must be between 1 and 700.'); return; }
+    setValidationError('');
     updateProfile({
-      name: inputName,
+      name: inputName.trim(),
       age: inputAge,
       gender: inputGender,
       height: inputHeight,
@@ -172,6 +179,9 @@ export default function BmiCalculator() {
               </div>
             </div>
 
+            {validationError && (
+              <p className="text-red-400 font-mono text-xs mt-2">{validationError}</p>
+            )}
             <button 
               onClick={handleCalculate}
               className="w-full mt-4 bg-lime-400 text-dark bebas text-xl py-3 hover:bg-lime-300 transition-colors transform hover:scale-[1.02] duration-300"

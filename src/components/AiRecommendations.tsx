@@ -14,6 +14,7 @@ export default function AiRecommendations() {
   const { state } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<RecData | null>(null);
+  const [recError, setRecError] = useState('');
   
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -45,11 +46,16 @@ export default function AiRecommendations() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data: payload })
       });
+      if (!res.ok) {
+        setRecError('Could not generate recommendations. Please try again.');
+        return;
+      }
       const json = await res.json();
+      setRecError('');
       setData(json);
-    } catch(e) {
-      console.error(e);
-      alert("Failed to analyze.");
+    } catch {
+      // Never expose raw errors — show a generic message
+      setRecError('Failed to connect. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -85,6 +91,9 @@ export default function AiRecommendations() {
            >
              {loading ? <><Loader2 className="animate-spin mr-3" /> ANALYZING VITAL DATA...</> : <><Zap className="mr-2" /> GENERATE INSIGHTS</>}
            </button>
+        )}
+        {recError && (
+          <p className="text-red-400 font-mono text-xs mt-4">{recError}</p>
         )}
       </div>
 

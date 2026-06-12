@@ -4,13 +4,31 @@ import { useGSAP } from '@gsap/react';
 import { useAppStore } from '@/store';
 import { Trash2, Sparkles, Loader2 } from 'lucide-react';
 
-const CALORIE_GOAL = 2500;
+// BL-004 fix: derive calorie goal from profile using Mifflin-St Jeor BMR × activity multiplier
+// instead of a dangerous hardcoded value.
+function calcCalorieGoal(profile: { age: number; weight: number; height: number; gender: string; unitSystem: 'metric' | 'imperial' }): number {
+  const { age, weight, height, gender, unitSystem } = profile;
+  // Convert to metric if needed
+  const wKg = unitSystem === 'metric' ? weight : weight * 0.453592;
+  const hCm = unitSystem === 'metric' ? height : height * 2.54;
+  // Mifflin-St Jeor BMR
+  const bmr = gender === 'F'
+    ? (10 * wKg) + (6.25 * hCm) - (5 * age) - 161
+    : (10 * wKg) + (6.25 * hCm) - (5 * age) + 5;
+  // Assume moderate activity (×1.55) as a safe default
+  const goal = Math.round(bmr * 1.55);
+  // Clamp to a safe range: 1200–4000 kcal
+  return Math.min(4000, Math.max(1200, goal));
+}
 
 export default function DietPlanner() {
   const { state, addMeal, deleteMeal } = useAppStore();
   const [nlInput, setNlInput] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [filter, setFilter] = useState('All');
+  const [parseError, setParseError] = useState('');
+
+  const CALORIE_GOAL = calcCalorieGoal(state.profile);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const todaysMeals = state.meals.filter(m => m.date === todayStr);
@@ -24,7 +42,13 @@ export default function DietPlanner() {
   }), { cal: 0, pro: 0, carbs: 0, fat: 0 });
 
   const handleParseMeal = async () => {
-    if (!nlInput) return;
+    if (!nlInput.trim()) return;
+    // Enforce client-side length cap matching the server's 500-char limit
+    if (nlInput.length > 500) {
+      setParseError('Input too long — please keep it under 500 characters.');
+      return;
+    }
+    setParseError('');
     setIsParsing(true);
     try {
       const res = await fetch('/api/parse-meal', {
@@ -32,8 +56,15 @@ export default function DietPlanner() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: nlInput })
       });
+      if (!res.ok) {
+        setParseError('Could not parse meal. Please try again.');
+        return;
+      }
       const data = await res.json();
-      
+      if (data.isValidFood === false) {
+        setParseError('That does not appear to be a valid food item.');
+        return;
+      }
       if (data.name) {
         addMeal({
           name: data.name,
@@ -46,9 +77,9 @@ export default function DietPlanner() {
         });
         setNlInput('');
       }
-    } catch(e) {
-      console.error(e);
-      alert('Failed to parse meal.');
+    } catch {
+      // Never log raw error objects — show a generic user message
+      setParseError('Failed to parse meal. Check your connection and try again.');
     } finally {
       setIsParsing(false);
     }
@@ -98,6 +129,9 @@ export default function DietPlanner() {
               >
                 {isParsing ? <><Loader2 className="animate-spin" size={18} /> ANALYZING...</> : 'LOG MEAL'}
               </button>
+              {parseError && (
+                <p className="text-red-400 font-mono text-[10px] mt-2">{parseError}</p>
+              )}
             </div>
 
             <div className="bg-dark p-5 border border-dark-border w-full">

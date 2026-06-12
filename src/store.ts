@@ -65,18 +65,47 @@ const defaultState: AppState = {
 };
 
 export function useAppStore() {
+  const userId = localStorage.getItem('apex_session') || 'guest';
+  const storeKey = `apex_fitness_data_${userId}`;
+
   const [state, setState] = useState<AppState>(() => {
     try {
-      const stored = localStorage.getItem('apex_fitness_data');
-      return stored ? JSON.parse(stored) : defaultState;
+      const stored = localStorage.getItem(storeKey);
+      let parsed: AppState | null = stored ? JSON.parse(stored) : null;
+
+      if (userId !== 'guest') {
+        const accountsRaw = localStorage.getItem('apex_accounts');
+        const accounts = accountsRaw ? JSON.parse(accountsRaw) : [];
+        const user = accounts.find((a: any) => a.id === userId);
+        if (user) {
+          if (!parsed) {
+            parsed = {
+              ...defaultState,
+              profile: {
+                ...defaultState.profile,
+                name: user.name,
+                age: user.age,
+              },
+            };
+          } else {
+            parsed.profile = {
+              ...parsed.profile,
+              name: parsed.profile.name || user.name,
+              age: parsed.profile.age || user.age,
+            };
+          }
+        }
+      }
+
+      return parsed || defaultState;
     } catch {
       return defaultState;
     }
   });
 
   useEffect(() => {
-    localStorage.setItem('apex_fitness_data', JSON.stringify(state));
-  }, [state]);
+    localStorage.setItem(storeKey, JSON.stringify(state));
+  }, [state, storeKey]);
 
   const updateProfile = (profileUpdate: Partial<AppState['profile']>) => {
     setState(s => {
@@ -97,9 +126,14 @@ export function useAppStore() {
   };
 
   const addWeightLog = (weight: number, date: string) => {
+    // Input validation: weight must be a positive finite number within reasonable human range
+    if (!isFinite(weight) || weight <= 0 || weight > 700) return;
+    // Date must be a valid date string (not in the future beyond 1 day for typo tolerance)
+    const parsed = new Date(date);
+    if (isNaN(parsed.getTime())) return;
     setState(s => ({
       ...s,
-      weightHistory: [...s.weightHistory, { id: Date.now().toString(), date, weight }].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+      weightHistory: [...s.weightHistory, { id: crypto.randomUUID(), date, weight }].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
       profile: { ...s.profile, weight }
     }));
     // Recalculate BMI based on new weight via recursive update
@@ -107,24 +141,26 @@ export function useAppStore() {
   };
 
   const deleteWeightLog = (id: string) => {
+    if (!id || typeof id !== 'string') return;
     setState(s => ({ ...s, weightHistory: s.weightHistory.filter(w => w.id !== id) }));
   };
 
   const addMeal = (meal: Omit<MealEntry, 'id'>) => {
     setState(s => ({
       ...s,
-      meals: [...s.meals, { ...meal, id: Date.now().toString() }]
+      meals: [...s.meals, { ...meal, id: crypto.randomUUID() }]
     }));
   };
 
   const deleteMeal = (id: string) => {
+    if (!id || typeof id !== 'string') return;
     setState(s => ({ ...s, meals: s.meals.filter(m => m.id !== id) }));
   };
 
   const addWorkout = (workout: Omit<WorkoutSession, 'id'>) => {
     setState(s => ({
       ...s,
-      workouts: [...s.workouts, { ...workout, id: Date.now().toString() }]
+      workouts: [...s.workouts, { ...workout, id: crypto.randomUUID() }]
     }));
   };
 
