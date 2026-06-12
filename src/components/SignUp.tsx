@@ -118,7 +118,7 @@ export default function SignUp() {
     setLoading(true);
     await new Promise(r => setTimeout(r, 800)); // simulate async
 
-    const result = signUp(name, email, parseInt(age), password);
+    const result = await signUp(name, email, parseInt(age), password);
     setLoading(false);
 
     if (!result.success) {

@@ -5,7 +5,6 @@ export interface UserAccount {
   name: string;
   email: string;
   age: number;
-  passwordHash: string; // simple base64 "hash" for demo
   createdAt: string;
 }
 
@@ -14,93 +13,165 @@ export interface AuthState {
   currentUser: UserAccount | null;
 }
 
-const ACCOUNTS_KEY = 'apex_accounts';
+const JWT_KEY = 'apex_jwt_token';
+const USER_KEY = 'apex_current_user';
 const SESSION_KEY = 'apex_session';
 
-function simpleHash(str: string): string {
-  return btoa(encodeURIComponent(str));
-}
-
-function getAccounts(): UserAccount[] {
+// Helper to safely fetch stored user
+function getStoredUser(): UserAccount | null {
   try {
-    const raw = localStorage.getItem(ACCOUNTS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
   } catch {
-    return [];
+    return null;
   }
 }
 
-function saveAccounts(accounts: UserAccount[]) {
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+// Global singleton state to sync authentication across multiple hook instances
+let globalAuthState: AuthState = {
+  isAuthenticated: !!localStorage.getItem(JWT_KEY) && !!getStoredUser(),
+  currentUser: getStoredUser()
+};
+
+const listeners = new Set<() => void>();
+
+function emitChange() {
+  listeners.forEach(l => l());
 }
 
-function getSession(): string | null {
-  return localStorage.getItem(SESSION_KEY);
-}
+// Global background token verification flag
+let hasAttemptedVerification = false;
 
-function saveSession(userId: string) {
-  localStorage.setItem(SESSION_KEY, userId);
-}
-
-function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
+function verifyTokenBackground() {
+  const token = localStorage.getItem(JWT_KEY);
+  if (token && !hasAttemptedVerification) {
+    hasAttemptedVerification = true;
+    fetch('/api/auth/me', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    .then(res => {
+      if (res.ok) return res.json();
+      throw new Error('Verification failed');
+    })
+    .then(data => {
+      globalAuthState = {
+        isAuthenticated: true,
+        currentUser: data.user
+      };
+      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+      localStorage.setItem(SESSION_KEY, data.user.id);
+      emitChange();
+    })
+    .catch(() => {
+      // Clean up invalid session
+      localStorage.removeItem(JWT_KEY);
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(SESSION_KEY);
+      globalAuthState = {
+        isAuthenticated: false,
+        currentUser: null
+      };
+      emitChange();
+    });
+  }
 }
 
 export function useAuthStore() {
-  const [auth, setAuth] = useState<AuthState>(() => {
-    const userId = getSession();
-    if (!userId) return { isAuthenticated: false, currentUser: null };
-    const accounts = getAccounts();
-    const user = accounts.find(a => a.id === userId) || null;
-    return { isAuthenticated: !!user, currentUser: user };
-  });
+  const [auth, setAuth] = useState<AuthState>(globalAuthState);
 
-  const signUp = (
+  useEffect(() => {
+    // Verify token once on hook initialization in client
+    verifyTokenBackground();
+
+    const handleChange = () => {
+      setAuth({ ...globalAuthState });
+    };
+
+    listeners.add(handleChange);
+    return () => {
+      listeners.delete(handleChange);
+    };
+  }, []);
+
+  const signUp = async (
     name: string,
     email: string,
     age: number,
     password: string
-  ): { success: boolean; error?: string } => {
-    const accounts = getAccounts();
-    if (accounts.find(a => a.email.toLowerCase() === email.toLowerCase())) {
-      return { success: false, error: 'An account with this email already exists.' };
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, age, password })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Registration failed.' };
+      }
+
+      localStorage.setItem(JWT_KEY, data.token);
+      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+      localStorage.setItem(SESSION_KEY, data.user.id);
+
+      globalAuthState = {
+        isAuthenticated: true,
+        currentUser: data.user
+      };
+      emitChange();
+      return { success: true };
+    } catch (err) {
+      console.error('Registration API error:', err);
+      return { success: false, error: 'Could not connect to authentication server.' };
     }
-    const newUser: UserAccount = {
-      id: crypto.randomUUID(),
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      age,
-      passwordHash: simpleHash(password),
-      createdAt: new Date().toISOString(),
-    };
-    saveAccounts([...accounts, newUser]);
-    saveSession(newUser.id);
-    setAuth({ isAuthenticated: true, currentUser: newUser });
-    return { success: true };
   };
 
-  const login = (
+  const login = async (
     email: string,
     password: string
-  ): { success: boolean; error?: string } => {
-    const accounts = getAccounts();
-    const user = accounts.find(
-      a => a.email.toLowerCase() === email.trim().toLowerCase()
-    );
-    if (!user) {
-      return { success: false, error: 'No account found with this email.' };
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Login failed.' };
+      }
+
+      localStorage.setItem(JWT_KEY, data.token);
+      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+      localStorage.setItem(SESSION_KEY, data.user.id);
+
+      globalAuthState = {
+        isAuthenticated: true,
+        currentUser: data.user
+      };
+      emitChange();
+      return { success: true };
+    } catch (err) {
+      console.error('Login API error:', err);
+      return { success: false, error: 'Could not connect to authentication server.' };
     }
-    if (user.passwordHash !== simpleHash(password)) {
-      return { success: false, error: 'Incorrect password. Please try again.' };
-    }
-    saveSession(user.id);
-    setAuth({ isAuthenticated: true, currentUser: user });
-    return { success: true };
   };
 
   const logout = () => {
-    clearSession();
-    setAuth({ isAuthenticated: false, currentUser: null });
+    localStorage.removeItem(JWT_KEY);
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(SESSION_KEY);
+    hasAttemptedVerification = false;
+
+    globalAuthState = {
+      isAuthenticated: false,
+      currentUser: null
+    };
+    emitChange();
   };
 
   return { auth, signUp, login, logout };

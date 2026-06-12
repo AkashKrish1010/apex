@@ -30,6 +30,43 @@ export default function Dashboard() {
     };
   }, [state.meals]);
 
+  const heatmapCells = useMemo(() => {
+    const arr = [];
+    for (let i = 27; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      const hasActivity = 
+        state.workouts.some(w => {
+          try {
+            const wDateStr = new Date(w.date).toISOString().split('T')[0];
+            return wDateStr === dateStr;
+          } catch {
+            return false;
+          }
+        }) ||
+        state.meals.some(m => {
+          try {
+            const mDateStr = new Date(m.date).toISOString().split('T')[0];
+            return mDateStr === dateStr;
+          } catch {
+            return false;
+          }
+        }) ||
+        state.weightHistory.some(wh => {
+          try {
+            const whDateStr = new Date(wh.date).toISOString().split('T')[0];
+            return whDateStr === dateStr;
+          } catch {
+            return false;
+          }
+        });
+      arr.push({ active: hasActivity });
+    }
+    return arr;
+  }, [state.workouts, state.meals, state.weightHistory]);
+
   useGSAP(() => {
     // Stat counters
     const counters = gsap.utils.toArray('.stat-counter') as HTMLElement[];
@@ -132,13 +169,11 @@ export default function Dashboard() {
           <div className="md:col-span-2 bg-dark border border-dark-border p-6 flex flex-col">
             <h3 className="bebas text-xl w-full text-left mb-6 text-white">WORKOUT HEATMAP (LAST 30 DAYS)</h3>
             <div className="grid grid-cols-7 gap-1 md:gap-2 flex-grow">
-              {Array.from({length: 28}).map((_, i) => {
-                // Mock logic for heatmap
-                const isActive = i % 3 === 0 || i % 7 === 1;
+              {heatmapCells.map((cell, i) => {
                 return (
                   <div 
                     key={i} 
-                    className={`aspect-square rounded-sm border transition-all duration-500 ${isActive ? 'bg-lime-400 border-lime-400 shadow-[0_0_5px_rgba(204,255,0,0.5)]' : 'bg-dark-surface border-dark-border'}`}
+                    className={`aspect-square rounded-sm border transition-all duration-500 ${cell.active ? 'bg-lime-400 border-lime-400 shadow-[0_0_5px_rgba(204,255,0,0.5)]' : 'bg-dark-surface border-dark-border'}`}
                   />
                 );
               })}
