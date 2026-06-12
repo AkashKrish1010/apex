@@ -1,0 +1,43 @@
+name: Apex Web E2E & Security Test Verification
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Verify Test Reports
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install openpyxl
+
+      - name: Publish Test Results to Job Summary
+        run: |
+          python tests/publish_results.py
+
+      - name: Upload E2E Test Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: Apex-Web-E2E-Test-Report
+          path: tests/reports/E2E_Test_Report_Apex_2026-06-11T12-33-59.xlsx
+
+      - name: Upload Security Review Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: Apex-Web-Security-Review-Report
+          path: tests/reports/Security_Review_Apex_2026-06-11T14-36-40 (1).xlsx
