@@ -3,6 +3,7 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useAppStore } from '@/store';
 import { Loader2, Zap } from 'lucide-react';
+import { API_URL } from '@/constants';
 
 interface RecData {
   dietRecommendations: string;
@@ -41,7 +42,7 @@ export default function AiRecommendations() {
     };
 
     try {
-      const res = await fetch('/api/recommendations', {
+      const res = await fetch(`${API_URL}/api/recommendations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data: payload })

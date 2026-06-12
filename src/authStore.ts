@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_URL } from './constants';
 
 export interface UserAccount {
   id: string;
@@ -46,7 +47,7 @@ function verifyTokenBackground() {
   const token = localStorage.getItem(JWT_KEY);
   if (token && !hasAttemptedVerification) {
     hasAttemptedVerification = true;
-    fetch('/api/auth/me', {
+    fetch(`${API_URL}/api/auth/me`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -102,7 +103,7 @@ export function useAuthStore() {
     password: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await fetch('/api/auth/register', {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, age, password })
@@ -134,7 +135,7 @@ export function useAuthStore() {
     password: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })

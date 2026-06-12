@@ -3,6 +3,7 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useAppStore } from '@/store';
 import { Trash2, Sparkles, Loader2, Apple, Flame, Plus } from 'lucide-react';
+import { API_URL } from '@/constants';
 
 function calcCalorieGoal(profile: { age: number; weight: number; height: number; gender: string; unitSystem: 'metric' | 'imperial' }): number {
   const { age, weight, height, gender, unitSystem } = profile;
@@ -51,7 +52,7 @@ export default function DietPlanner() {
     setParseError('');
     setIsParsing(true);
     try {
-      const res = await fetch('/api/parse-meal', {
+      const res = await fetch(`${API_URL}/api/parse-meal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: nlInput })

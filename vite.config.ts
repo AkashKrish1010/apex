@@ -15,6 +15,12 @@ export default defineConfig(() => {
       // HMR and file watching are controlled by NODE_ENV — never enable in production.
       hmr: process.env.NODE_ENV !== 'production',
       watch: process.env.NODE_ENV === 'production' ? null : {},
+      proxy: {
+        '/api': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+        },
+      },
     },
   };
 });

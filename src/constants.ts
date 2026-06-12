@@ -22,3 +22,5 @@ export const BMI_CATEGORIES = [
   { max: 29.9, label: "Overweight", color: "text-yellow-400" },
   { max: 100, label: "Obese", color: "text-red-500" },
 ];
+
+export const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
